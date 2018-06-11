@@ -1,15 +1,44 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 
 module Main where
 
+import           Data.List
+import qualified Data.Map            as M
+import           Data.Maybe
 import           Data.Typeable
 import           Hel
 import           Printer
 import           RuntimeSchema
 import           Schema
+import           System.Console.ANSI
+import           System.IO
+import           Text.Read
+
+
+signalBoxProgram :: M.Map Integer TurnoutState -> IO ()
+signalBoxProgram turnoutStates = do
+    clearScreen
+    setCursorPosition 0 0
+
+    putStrLn $ showRS turnoutStates $ getRuntimeSchema helSchema
+
+    putStr "\n?>"
+    hFlush stdout
+    getLine >>= \case
+        "q" -> putStrLn "Auf wiedersehen!"
+        input -> case stripPrefix "r" input >>= (\nr -> readMaybe nr :: Maybe Integer) of
+            Just nr  -> signalBoxProgram (M.insert nr newVal turnoutStates)
+              where
+                newVal = case fromMaybe Plus (nr `M.lookup` turnoutStates) of
+                                                         Plus  -> Minus
+                                                         Minus -> Plus
+            Nothing -> signalBoxProgram turnoutStates
+
+
 
 main :: IO ()
 main = do
@@ -41,6 +70,7 @@ main = do
 
     print x
     print $ allLinks x
-    putStrLn $ showRS x
+    putStrLn $ showRS (M.singleton 1 Minus) x
 
-    putStrLn $ showRS $ getRuntimeSchema helSchema
+
+    signalBoxProgram M.empty

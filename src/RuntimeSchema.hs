@@ -14,12 +14,13 @@ module RuntimeSchema
  , showTurnout
  ) where
 
-import qualified Data.Map     as M
+import qualified Data.Map            as M
 import           Data.Maybe
 import           Data.Proxy
-import qualified Data.Set     as S
+import qualified Data.Set            as S
 import           GHC.TypeLits
 import           Schema
+import           System.Console.ANSI
 
 newtype RLeftLink = RLeftLink Integer deriving (Show, Eq, Ord)
 newtype RRightLink = RRightLink Integer deriving (Show, Eq, Ord)
@@ -81,7 +82,6 @@ instance RuntimeableInternal (Schema s p t l u) where
             aux (RuntimeSchema (RSemaphoreLeft (symbolVal $ Proxy @name) (RRightLink $ natVal $ Proxy @l1) (RLeftLink $ natVal $ Proxy @l2) : ss) ps ts es) rest
         aux (RuntimeSchema ss ps ts es) (SemaphoreCons (SemaphoreRight (Link SLeftLink :: Link _ l1) (Link SRightLink :: Link _ l2) :: Semaphore name _ _) rest) =
             aux (RuntimeSchema (RSemaphoreRight (symbolVal $ Proxy @name) (RLeftLink $ natVal $ Proxy @l1) (RRightLink $ natVal $ Proxy @l2) : ss) ps ts es) rest
--- todo
 
 
 allLinks :: RuntimeSchema -> ([RLeftLink], [RRightLink])
@@ -102,8 +102,8 @@ turnoutLinks (RTLeftDown _ r l1 l2)  = ([l1, l2], [r])
 turnoutLinks (RTRightUp _ l r1 r2)   = ([l], [r1, r2])
 turnoutLinks (RTRightDown _ l r1 r2) = ([l], [r1, r2])
 
-showRS :: RuntimeSchema -> String
-showRS runtime =
+showRS :: M.Map Integer TurnoutState -> RuntimeSchema -> String
+showRS turnoutStates runtime =
     show positionedTurnouts ++ "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs ++ semaphoreObjs)
   where
     RuntimeSchema semaphores turnouts tracks ends = runtime
@@ -195,43 +195,45 @@ showRS runtime =
         aux t@(RTRightDown _ l rPlus rMinus)    = (t, (3 * (rLevels M.! rPlus), absoluteR M.! rMinus - width t))
         width t = 3 * (turnoutSize t + 2)
 
-    turnoutObjs :: [((Int, Int), [String])]
-    turnoutObjs = map (\(t, position) -> (position, getStrings t)) positionedTurnouts
+    turnoutObjs :: [((Int, Int), [[TC]])]
+    turnoutObjs = map (\(t, position) -> (position, map tc $ getStrings t)) positionedTurnouts
       where
         getStrings :: RuntimeTurnout -> [String]
-        getStrings t@(RTLeftUp nr _ _ _)    = showTurnout SLeftUp (turnoutSize t) nr Plus
-        getStrings t@(RTRightUp nr _ _ _)   = showTurnout SRightUp (turnoutSize t) nr Plus
-        getStrings t@(RTLeftDown nr _ _ _)  = showTurnout SLeftDown (turnoutSize t) nr Plus
-        getStrings t@(RTRightDown nr _ _ _) = showTurnout SRightDown (turnoutSize t) nr Plus
+        getStrings t@(RTLeftUp nr _ _ _)    = showTurnout SLeftUp (turnoutSize t) nr $ tState nr
+        getStrings t@(RTRightUp nr _ _ _)   = showTurnout SRightUp (turnoutSize t) nr $ tState nr
+        getStrings t@(RTLeftDown nr _ _ _)  = showTurnout SLeftDown (turnoutSize t) nr $ tState nr
+        getStrings t@(RTRightDown nr _ _ _) = showTurnout SRightDown (turnoutSize t) nr $ tState nr
 
-    trackObjs :: [((Int, Int), [String])]
+        tState nr = fromMaybe Plus $ nr `M.lookup` turnoutStates
+
+    trackObjs :: [((Int, Int), [[TC]])]
     trackObjs = map aux tracks
       where
-        aux t@(RTrack level len nr r l) = ((3 * level, absoluteR M.! r), showTrack t)
+        aux t@(RTrack level len nr r l) = ((3 * level, absoluteR M.! r), map tc $ showTrack t)
 
-    semaphoreObjs :: [((Int, Int), [String])]
+    semaphoreObjs :: [((Int, Int), [[TC]])]
     semaphoreObjs = map aux semaphores
       where
-        aux (RSemaphoreLeft name r l) = ((3 * (rLevels M.! r) - 1, absoluteR M.! r - 2), [name, "◀<"])
-        aux (RSemaphoreRight name l r) = ((3 * (rLevels M.! r), absoluteR M.! r - 2), [">▶", " " ++ name])
+        aux (RSemaphoreLeft name r l) = ((3 * (rLevels M.! r) - 1, absoluteR M.! r - 2), [tc name, red "◀<"])
+        aux (RSemaphoreRight name l r) = ((3 * (rLevels M.! r), absoluteR M.! r - 2), [red ">▶", tc $ " " ++ name])
 
-printObjs :: [((Int, Int), [String])] -> [String]
+printObjs :: [((Int, Int), [[TC]])] -> [String]
 printObjs objs = fromCharMap $ foldr draw (toCharMap canvas) objs
   where
-    toCharMap :: [String] -> M.Map Int (M.Map Int Char)
+    toCharMap :: [[TC]] -> M.Map Int (M.Map Int TC)
     toCharMap ss = M.map (M.fromList . zip [1..]) $ M.fromList (zip [1..] ss)
 
-    fromCharMap :: M.Map Int (M.Map Int Char) -> [String]
-    fromCharMap mp = map M.elems $ M.elems mp
+    fromCharMap :: M.Map Int (M.Map Int TC) -> [String]
+    fromCharMap mp = map (concatMap show . M.elems) $ M.elems mp
 
-    canvas = replicate height $ replicate width ' '
+    canvas = replicate height $ replicate width (TC " ")
     height = maximum $ map (\((x, _), ss) -> x + length ss) objs
     width = maximum $ map (\((_, y), ss) -> y + maximum (map length ss)) objs
 
     draw ((x, y), ss) accCanvas = M.foldrWithKey auxLine accCanvas (M.mapKeys (+x) $ M.map (M.mapKeys (+y)) (toCharMap ss))
-    auxLine :: Int -> M.Map Int Char -> M.Map Int (M.Map Int Char) -> M.Map Int (M.Map Int Char)
+    auxLine :: Int -> M.Map Int TC -> M.Map Int (M.Map Int TC) -> M.Map Int (M.Map Int TC)
     auxLine line mp accCanvas = M.insert line (M.foldrWithKey auxChar (accCanvas M.! line) mp) accCanvas
-    auxChar nr char = if char /= '@' then M.insert nr char else id
+    auxChar nr char = if char /= TC "@" then M.insert nr char else id
 
 
 showTurnout :: STurnoutDirection td -> Int -> Integer -> TurnoutState -> [String]
@@ -296,3 +298,18 @@ showTrack (RTrack _ len nr _ _) = [replicate leftLen '─' ++ nrRep ++ replicate
     nrRep = if nr > 0 then show nr else ""
     leftLen = (len - length nrRep) `div` 2
     rightLen = len - leftLen - length nrRep
+
+
+newtype TC = TC String deriving Eq -- turbo char
+
+instance Show TC where
+    show (TC str) = str
+
+red :: String -> [TC]
+red = map (TC . (\c -> setSGRCode [SetColor Foreground Vivid Red] ++ c : setSGRCode []))
+
+green :: String -> [TC]
+green = map (TC . (\c -> setSGRCode [SetColor Foreground Vivid Green] ++ c : setSGRCode []))
+
+tc :: String -> [TC]
+tc = map (TC . (:[]))
