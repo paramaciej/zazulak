@@ -7,7 +7,12 @@
 
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 
-module RuntimeSchema where
+module RuntimeSchema
+ ( getRuntimeSchema
+ , showRS
+ , allLinks
+ , showTurnout
+ ) where
 
 import qualified Data.Map     as M
 import           Data.Maybe
@@ -35,11 +40,18 @@ data RuntimeEnd
 
 data RuntimeSchema = RuntimeSchema [RuntimeTurnout] [RuntimeTrack] [RuntimeEnd] deriving Show
 
+
 class Runtimeable a where
     getRuntimeSchema :: a -> RuntimeSchema
 
-instance Runtimeable (Schema s t l) where
-    getRuntimeSchema = aux (RuntimeSchema [] [] [])
+instance Runtimeable (CompleteSchema (Schema s t l)) where
+    getRuntimeSchema (CompleteSchema schema) = getRuntimeSchema' schema
+
+class RuntimeableInternal a where
+    getRuntimeSchema' :: a -> RuntimeSchema
+
+instance RuntimeableInternal (Schema s t l) where
+    getRuntimeSchema' = aux (RuntimeSchema [] [] [])
       where
         aux :: forall s t l. RuntimeSchema -> Schema s t l -> RuntimeSchema
         aux runtime SNil = runtime
@@ -117,6 +129,7 @@ showRS runtime =
         processTurnout (RTLeftUp _ r lPlus lMinus) mp = M.insert r [getEdge r lPlus, getEdge r lMinus] mp
         processTurnout (RTLeftDown _ r lPlus lMinus) mp = M.insert r [getEdge r lPlus, getEdge r lMinus] mp
         processTurnout (RTRightUp _ l rPlus rMinus) mp = M.insert rPlus [getEdge rPlus l] $ M.insert rMinus [getEdge rMinus l] mp
+        processTurnout (RTRightDown _ l rPlus rMinus) mp = M.insert rPlus [getEdge rPlus l] $ M.insert rMinus [getEdge rMinus l] mp
         getEdge r l = let levelDiff = 1 `max` abs (rLevels M.! r - lLevels M.! l) in (l, 3 * (levelDiff + 2))
 
 

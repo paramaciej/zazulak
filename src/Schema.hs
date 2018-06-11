@@ -125,4 +125,7 @@ data Schema :: [*] -> [*] -> [*] -> * where
 
 deriving instance Show (Schema s t l)
 
+data CompleteSchema schema where
+    CompleteSchema :: Schema s t '[] -> CompleteSchema (Schema s t '[])
 
+deriving instance Show (CompleteSchema schema)

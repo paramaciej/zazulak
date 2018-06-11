@@ -20,6 +20,9 @@ import           Schema
 class SchemaShow a where
     sShow :: a -> String
 
+instance SchemaShow (CompleteSchema (Schema s t l)) where
+    sShow (CompleteSchema schema) = sShow schema
+
 instance SchemaShow (Schema s t l) where
     sShow (TrackCons t rest) = sShow t ++ "\n" ++ sShow rest
     sShow (SingleTurnoutCons singleTurnout rest) = sShow singleTurnout ++ "\n" ++ sShow rest

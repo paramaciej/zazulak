@@ -21,8 +21,9 @@ main = do
     putStrLn $ sShow test3
 
 
-    let ultimate    = TrackCons (Track 1 70 lr ll :: Track 2 (Link RightLink 4) (Link LeftLink 5))
-                    $ TrackCons (Track 2 70 lr ll :: Track 1 (Link RightLink 3) (Link LeftLink 6))
+    let ultimate    = CompleteSchema
+                    $ TrackCons (Track 1 50 lr ll :: Track 2 (Link RightLink 4) (Link LeftLink 5))
+                    $ TrackCons (Track 2 50 lr ll :: Track 1 (Link RightLink 3) (Link LeftLink 6))
                     $ TrackCons (Track 2 10 lr ll :: Track 0 (Link RightLink 7) (Link LeftLink 8))
                     $ TrackCons (Track 2 10 lr ll :: Track 0 (Link RightLink 1) (Link LeftLink 2))
                     $ SingleTurnoutCons (SingleTurnoutRightUp (Turnout SRightUp :: (Turnout _ 1)) ll lr lr :: SingleTurnout (Link LeftLink 2) (Link RightLink 3) (Link RightLink 4))
