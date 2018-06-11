@@ -24,6 +24,11 @@ import           Schema
 newtype RLeftLink = RLeftLink Integer deriving (Show, Eq, Ord)
 newtype RRightLink = RRightLink Integer deriving (Show, Eq, Ord)
 
+data RuntimeSemaphore
+    = RSemaphoreLeft String RRightLink RLeftLink
+    | RSemaphoreRight String RLeftLink RRightLink
+    deriving Show
+
 data RuntimeTurnout
     = RTLeftUp Integer RRightLink RLeftLink RLeftLink
     | RTRightUp Integer RLeftLink RRightLink RRightLink
@@ -38,50 +43,58 @@ data RuntimeEnd
     | RRightEnd RLeftLink
     deriving Show
 
-data RuntimeSchema = RuntimeSchema [RuntimeTurnout] [RuntimeTrack] [RuntimeEnd] deriving Show
+data RuntimeSchema = RuntimeSchema [RuntimeSemaphore] [RuntimeTurnout] [RuntimeTrack] [RuntimeEnd] deriving Show
 
 
 class Runtimeable a where
     getRuntimeSchema :: a -> RuntimeSchema
 
-instance Runtimeable (CompleteSchema (Schema s t l)) where
+instance Runtimeable (CompleteSchema (Schema s p t l u)) where
     getRuntimeSchema (CompleteSchema schema) = getRuntimeSchema' schema
 
 class RuntimeableInternal a where
     getRuntimeSchema' :: a -> RuntimeSchema
 
-instance RuntimeableInternal (Schema s t l) where
-    getRuntimeSchema' = aux (RuntimeSchema [] [] [])
+instance RuntimeableInternal (Schema s p t l u) where
+    getRuntimeSchema' = aux (RuntimeSchema [] [] [] [])
       where
-        aux :: forall s t l. RuntimeSchema -> Schema s t l -> RuntimeSchema
+        aux :: forall s p t l u. RuntimeSchema -> Schema s p t l u -> RuntimeSchema
         aux runtime SNil = runtime
-        aux (RuntimeSchema ss ts es) (SingleTurnoutCons (SingleTurnoutLeftUp (Turnout SLeftUp :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
-            aux (RuntimeSchema (RTLeftUp (natVal $ Proxy @n) (RRightLink $ natVal $ Proxy @lIn) (RLeftLink $ natVal $ Proxy @lPlus) (RLeftLink $ natVal $ Proxy @lMinus) :  ss) ts es) rest
-        aux (RuntimeSchema ss ts es) (SingleTurnoutCons (SingleTurnoutRightUp (Turnout SRightUp :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
-            aux (RuntimeSchema (RTRightUp (natVal $ Proxy @n) (RLeftLink $ natVal $ Proxy @lIn) (RRightLink $ natVal $ Proxy @lPlus) (RRightLink $ natVal $ Proxy @lMinus) :  ss) ts es) rest
-        aux (RuntimeSchema ss ts es) (SingleTurnoutCons (SingleTurnoutLeftDown (Turnout SLeftDown :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
-            aux (RuntimeSchema (RTLeftDown (natVal $ Proxy @n) (RRightLink $ natVal $ Proxy @lIn) (RLeftLink $ natVal $ Proxy @lPlus) (RLeftLink $ natVal $ Proxy @lMinus) :  ss) ts es) rest
-        aux (RuntimeSchema ss ts es) (SingleTurnoutCons (SingleTurnoutRightDown (Turnout SRightDown :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
-            aux (RuntimeSchema (RTRightDown (natVal $ Proxy @n) (RLeftLink $ natVal $ Proxy @lIn) (RRightLink $ natVal $ Proxy @lPlus) (RRightLink $ natVal $ Proxy @lMinus) :  ss) ts es) rest
+        aux (RuntimeSchema ss ps ts es) (SingleTurnoutCons (SingleTurnoutLeftUp (Turnout SLeftUp :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
+            aux (RuntimeSchema ss (RTLeftUp (natVal $ Proxy @n) (RRightLink $ natVal $ Proxy @lIn) (RLeftLink $ natVal $ Proxy @lPlus) (RLeftLink $ natVal $ Proxy @lMinus) :  ps) ts es) rest
+        aux (RuntimeSchema ss ps ts es) (SingleTurnoutCons (SingleTurnoutRightUp (Turnout SRightUp :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
+            aux (RuntimeSchema ss (RTRightUp (natVal $ Proxy @n) (RLeftLink $ natVal $ Proxy @lIn) (RRightLink $ natVal $ Proxy @lPlus) (RRightLink $ natVal $ Proxy @lMinus) :  ps) ts es) rest
+        aux (RuntimeSchema ss ps ts es) (SingleTurnoutCons (SingleTurnoutLeftDown (Turnout SLeftDown :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
+            aux (RuntimeSchema ss (RTLeftDown (natVal $ Proxy @n) (RRightLink $ natVal $ Proxy @lIn) (RLeftLink $ natVal $ Proxy @lPlus) (RLeftLink $ natVal $ Proxy @lMinus) :  ps) ts es) rest
+        aux (RuntimeSchema ss ps ts es) (SingleTurnoutCons (SingleTurnoutRightDown (Turnout SRightDown :: Turnout _ n) (Link _ :: Link _ lIn) (Link _ :: Link _ lPlus) (Link _ :: Link _ lMinus) :: SingleTurnout _ _ _) rest) =
+            aux (RuntimeSchema ss (RTRightDown (natVal $ Proxy @n) (RLeftLink $ natVal $ Proxy @lIn) (RRightLink $ natVal $ Proxy @lPlus) (RRightLink $ natVal $ Proxy @lMinus) :  ps) ts es) rest
 
-        aux (RuntimeSchema ss ts es) (TrackCons (Track level len (Link SRightLink :: Link _ l1) (Link SLeftLink :: Link _ l2) :: Track n _ _) rest) =
-            aux (RuntimeSchema ss (RTrack level len (natVal $ Proxy @n) (RRightLink $ natVal $ Proxy @l1) (RLeftLink $ natVal $ Proxy @l2) : ts) es) rest
+        aux (RuntimeSchema ss ps ts es) (TrackCons (Track level len (Link SRightLink :: Link _ l1) (Link SLeftLink :: Link _ l2) :: Track n _ _) rest) =
+            aux (RuntimeSchema ss ps (RTrack level len (natVal $ Proxy @n) (RRightLink $ natVal $ Proxy @l1) (RLeftLink $ natVal $ Proxy @l2) : ts) es) rest
 
-        aux (RuntimeSchema ss ts es) (StationEndCons (StationLeftEnd (Link _ :: Link _ sel)) rest) =
-            aux (RuntimeSchema ss ts ((RLeftEnd $ RRightLink $ natVal $ Proxy @sel) : es)) rest
-        aux (RuntimeSchema ss ts es) (StationEndCons (StationRightEnd (Link _ :: Link _ sel)) rest) =
-            aux (RuntimeSchema ss ts ((RRightEnd $ RLeftLink $ natVal $ Proxy @sel) : es)) rest
+        aux (RuntimeSchema ss ps ts es) (StationEndCons (StationLeftEnd (Link _ :: Link _ sel)) rest) =
+            aux (RuntimeSchema ss ps ts ((RLeftEnd $ RRightLink $ natVal $ Proxy @sel) : es)) rest
+        aux (RuntimeSchema ss ps ts es) (StationEndCons (StationRightEnd (Link _ :: Link _ sel)) rest) =
+            aux (RuntimeSchema ss ps ts ((RRightEnd $ RLeftLink $ natVal $ Proxy @sel) : es)) rest
+
+        aux (RuntimeSchema ss ps ts es) (SemaphoreCons (SemaphoreLeft (Link SRightLink :: Link _ l1) (Link SLeftLink :: Link _ l2) :: Semaphore name _ _) rest) =
+            aux (RuntimeSchema (RSemaphoreLeft (symbolVal $ Proxy @name) (RRightLink $ natVal $ Proxy @l1) (RLeftLink $ natVal $ Proxy @l2) : ss) ps ts es) rest
+        aux (RuntimeSchema ss ps ts es) (SemaphoreCons (SemaphoreRight (Link SLeftLink :: Link _ l1) (Link SRightLink :: Link _ l2) :: Semaphore name _ _) rest) =
+            aux (RuntimeSchema (RSemaphoreRight (symbolVal $ Proxy @name) (RLeftLink $ natVal $ Proxy @l1) (RRightLink $ natVal $ Proxy @l2) : ss) ps ts es) rest
+-- todo
 
 
 allLinks :: RuntimeSchema -> ([RLeftLink], [RRightLink])
 allLinks = aux ([], [])
   where
-    aux (rlls, rrls) (RuntimeSchema [] [] []) = (rlls, rrls)
-    aux (rlls, rrls) (RuntimeSchema (s:ss) ts es) = aux (let (nl, nr) = turnoutLinks s in (nl ++ rlls, nr ++ rrls)) (RuntimeSchema ss ts es)
-    aux (rlls, rrls) (RuntimeSchema [] (RTrack _ _ _ r l : ts) es) = aux (l : rlls, r : rrls) (RuntimeSchema [] ts es)
-    aux (rlls, rrls) (RuntimeSchema [] [] (e:es)) = aux (case e of
+    aux (rlls, rrls) (RuntimeSchema [] [] [] []) = (rlls, rrls)
+    aux (rlls, rrls) (RuntimeSchema (RSemaphoreLeft _ r l : ss) ps ts es) = aux (l : rlls, r : rrls) (RuntimeSchema ss ps ts es)
+    aux (rlls, rrls) (RuntimeSchema (RSemaphoreRight _ l r : ss) ps ts es) = aux (l : rlls, r :rrls) (RuntimeSchema ss ps ts es)
+    aux (rlls, rrls) (RuntimeSchema [] (p:ps) ts es) = aux (let (nl, nr) = turnoutLinks p in (nl ++ rlls, nr ++ rrls)) (RuntimeSchema [] ps ts es)
+    aux (rlls, rrls) (RuntimeSchema [] [] (RTrack _ _ _ r l : ts) es) = aux (l : rlls, r : rrls) (RuntimeSchema [] [] ts es)
+    aux (rlls, rrls) (RuntimeSchema [] [] [] (e:es)) = aux (case e of
         RLeftEnd r  -> (rlls, r : rrls)
-        RRightEnd l -> (l : rlls, rrls)) (RuntimeSchema [] [] es)
+        RRightEnd l -> (l : rlls, rrls)) (RuntimeSchema [] [] [] es)
 
 turnoutLinks :: RuntimeTurnout -> ([RLeftLink], [RRightLink])
 turnoutLinks (RTLeftUp _ r l1 l2)    = ([l1, l2], [r])
@@ -91,9 +104,9 @@ turnoutLinks (RTRightDown _ l r1 r2) = ([l], [r1, r2])
 
 showRS :: RuntimeSchema -> String
 showRS runtime =
-    show positionedTurnouts ++ "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs)
+    show positionedTurnouts ++ "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs ++ semaphoreObjs)
   where
-    RuntimeSchema turnouts tracks ends = runtime
+    RuntimeSchema semaphores turnouts tracks ends = runtime
     (lTrackMap, rTrackMap) = foldr getTrack (M.empty, M.empty) tracks
       where
         getTrack t@(RTrack _ _ _ r l) (lMap, rMap) = (M.insert l t lMap, M.insert r t rMap)
@@ -124,13 +137,17 @@ showRS runtime =
         processTrack (RTrack level len _ r l) (linkDeps, lLevels, rLevels) = (M.insert l (r, len) linkDeps, M.insert l level lLevels, M.insert r level rLevels)
 
     lrDeps :: M.Map RRightLink [(RLeftLink, Int)]
-    lrDeps = foldr processTurnout M.empty turnouts
+    lrDeps = foldr processTurnout M.empty turnouts `M.union` foldr processSemaphores M.empty semaphores
       where
         processTurnout (RTLeftUp _ r lPlus lMinus) mp = M.insert r [getEdge r lPlus, getEdge r lMinus] mp
         processTurnout (RTLeftDown _ r lPlus lMinus) mp = M.insert r [getEdge r lPlus, getEdge r lMinus] mp
         processTurnout (RTRightUp _ l rPlus rMinus) mp = M.insert rPlus [getEdge rPlus l] $ M.insert rMinus [getEdge rMinus l] mp
         processTurnout (RTRightDown _ l rPlus rMinus) mp = M.insert rPlus [getEdge rPlus l] $ M.insert rMinus [getEdge rMinus l] mp
         getEdge r l = let levelDiff = 1 `max` abs (rLevels M.! r - lLevels M.! l) in (l, 3 * (levelDiff + 2))
+
+        processSemaphores :: RuntimeSemaphore -> M.Map RRightLink [(RLeftLink, Int)] -> M.Map RRightLink [(RLeftLink, Int)]
+        processSemaphores (RSemaphoreLeft _ r l)  = M.insert r [(l, 2)]
+        processSemaphores (RSemaphoreRight _ l r) = M.insert r [(l, 2)]
 
 
     startingRs :: M.Map RRightLink Int
@@ -192,6 +209,11 @@ showRS runtime =
       where
         aux t@(RTrack level len nr r l) = ((3 * level, absoluteR M.! r), showTrack t)
 
+    semaphoreObjs :: [((Int, Int), [String])]
+    semaphoreObjs = map aux semaphores
+      where
+        aux (RSemaphoreLeft name r l) = ((3 * (rLevels M.! r) - 1, absoluteR M.! r - 2), [name, "◀<"])
+        aux (RSemaphoreRight name l r) = ((3 * (rLevels M.! r), absoluteR M.! r - 2), [">▶", " " ++ name])
 
 printObjs :: [((Int, Int), [String])] -> [String]
 printObjs objs = fromCharMap $ foldr draw (toCharMap canvas) objs

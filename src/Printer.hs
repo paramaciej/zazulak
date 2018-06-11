@@ -20,10 +20,10 @@ import           Schema
 class SchemaShow a where
     sShow :: a -> String
 
-instance SchemaShow (CompleteSchema (Schema s t l)) where
+instance SchemaShow (CompleteSchema (Schema s p t l u)) where
     sShow (CompleteSchema schema) = sShow schema
 
-instance SchemaShow (Schema s t l) where
+instance SchemaShow (Schema s p t l u) where
     sShow (TrackCons t rest) = sShow t ++ "\n" ++ sShow rest
     sShow (SingleTurnoutCons singleTurnout rest) = sShow singleTurnout ++ "\n" ++ sShow rest
     sShow (StationEndCons stationEnd rest) = show stationEnd ++ "\n" ++ sShow rest
@@ -37,7 +37,7 @@ instance KnownNat n => SchemaShow (Track n l1 l2) where
         rightLen = len - leftLen - length nrRep
 
 instance SchemaShow (Turnout td n) where
-    sShow (Turnout direction) = unlines $ showTurnout direction 3 (natVal $ Proxy @n) Minus -- todo plus?
+    sShow (Turnout direction) = unlines $ showTurnout direction 3 (natVal $ Proxy @n) Plus
 
 instance SchemaShow (SingleTurnout l1 l2 l3) where
     sShow (SingleTurnoutLeftUp t _ _ _)    = sShow t
