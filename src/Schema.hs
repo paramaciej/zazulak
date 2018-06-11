@@ -1,40 +1,12 @@
 {-# LANGUAGE PolyKinds            #-}
--- {-# LANGUAGE TypeInType           #-}
-
--- {-# LANGUAGE AllowAmbiguousTypes  #-}
 {-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE GADTs                #-}
--- {-# LANGUAGE KindSignatures       #-}
--- {-# LANGUAGE RankNTypes           #-}
--- {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE StandaloneDeriving   #-}
--- {-# LANGUAGE TypeApplications     #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Schema where
-
--- data PointsType = LeftUp | RightUp | LeftDown | RightDown
--- data Rozjazd = Rozjazd Int PointsType
--- data PointState = Plus | Minus
---
---
---
--- showPoint :: Rozjazd -> PointState -> [String]
--- showPoint (Rozjazd _ RightUp) Plus =
---     [ " nr / "
---     , "------"
---     ]
--- showPoint (Rozjazd _ RightUp) Minus =
---     [ " nr / "
---     , "---/ -"]
-
--- --------------------
-
--- data Nat :: * where
---     Z :: Nat
---     S :: Nat -> Nat
 
 import           Data.Kind     (Type)
 import           Data.Typeable
