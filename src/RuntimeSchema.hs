@@ -12,6 +12,11 @@ module RuntimeSchema
  , showRS
  , allLinks
  , showTurnout
+ , RuntimeSchema (RuntimeSchema)
+ , RuntimeSemaphore
+ , RuntimeTrack
+ , RLeftLink (RLeftLink)
+ , RRightLink (RRightLink)
  ) where
 
 import qualified Data.Map            as M

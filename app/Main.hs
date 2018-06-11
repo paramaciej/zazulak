@@ -12,6 +12,7 @@ import           Data.Maybe
 import           Data.Typeable
 import           Hel
 import           Printer
+import           RuntimeFahrstrasse
 import           RuntimeSchema
 import           Schema
 import           System.Console.ANSI
@@ -25,6 +26,8 @@ signalBoxProgram turnoutStates = do
     setCursorPosition 0 0
 
     putStrLn $ showRS turnoutStates $ getRuntimeSchema helSchema
+
+    print $ getRuntimeFahrstrasse helFahrA1
 
     putStr "\n?>"
     hFlush stdout

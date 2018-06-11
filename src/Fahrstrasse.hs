@@ -1,12 +1,12 @@
-{-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE GADTs                #-}
-{-# LANGUAGE PolyKinds            #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes   #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE PolyKinds             #-}
+{-# LANGUAGE StandaloneDeriving    #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 
 
 {-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
@@ -14,8 +14,8 @@
 
 module Fahrstrasse where
 
-import Schema
-import Data.Typeable
+import           Data.Typeable
+import           Schema
 
 data TeilweiseFahrstrasse :: * -> * -> [*] -> [*] -> [*] -> [*] -> * where -- todo Teilweise
 -- completeSchema, starting semaphore, plusTurnouts, minusTurnouts, tracks, freeLinks
@@ -40,5 +40,9 @@ data TeilweiseFahrstrasse :: * -> * -> [*] -> [*] -> [*] -> [*] -> * where -- to
     FStop :: Link ld lnr -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft fl
         -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft (Remove (Link ld lnr) fl)
 
+deriving instance Show (TeilweiseFahrstrasse schema sem fp fm ft fl)
+
 data Fahrstrasse fahrstrasse where
     Fahrstrasse :: TeilweiseFahrstrasse schema sem fp fm ft '[] -> Fahrstrasse (TeilweiseFahrstrasse schema sem fp fm ft '[])
+
+deriving instance Show (Fahrstrasse fahrstrasse)
