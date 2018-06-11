@@ -6,6 +6,7 @@
 module Main where
 
 import           Data.Typeable
+import           Hel
 import           Printer
 import           RuntimeSchema
 import           Schema
@@ -41,3 +42,5 @@ main = do
     print x
     print $ allLinks x
     putStrLn $ showRS x
+
+    putStrLn $ showRS $ getRuntimeSchema helSchema
