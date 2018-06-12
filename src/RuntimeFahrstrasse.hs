@@ -22,7 +22,7 @@ newtype RRightLink = RRightLink Integer deriving (Show, Eq, Ord)
 data RuntimeFahrstrasse = RuntimeFahrstrasse Int String [Integer] [Integer] [(RRightLink, RLeftLink)]
 
 instance Show RuntimeFahrstrasse where
-    show (RuntimeFahrstrasse nr sem fp fm _) = "Fahrstraße " ++ sem ++ show nr ++ ": " ++ pointsStates
+    show (RuntimeFahrstrasse nr sem fp fm _) = "Fahrstraße " ++ show nr ++ " \t " ++ sem ++ " -> " ++ pointsStates
       where
         pointsStates :: String
         pointsStates = intercalate ", " $ map (\(nr, state) -> show nr ++ state) $ sort $ map (\x -> (x, "+")) fp ++ map (\x -> (x, "-")) fm

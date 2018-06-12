@@ -37,6 +37,11 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - zazulak
+  jastarnia:
+    main: MainJastarnia.hs
+    source-dirs: app
+    dependencies:
+    - zazulak
 
 tests:
   zazulak-test:
