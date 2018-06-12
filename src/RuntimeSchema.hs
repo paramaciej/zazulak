@@ -106,8 +106,8 @@ turnoutLinks (RTLeftDown _ r l1 l2)  = ([l1, l2], [r])
 turnoutLinks (RTRightUp _ l r1 r2)   = ([l], [r1, r2])
 turnoutLinks (RTRightDown _ l r1 r2) = ([l], [r1, r2])
 
-showRS :: M.Map Integer TurnoutState -> Maybe RuntimeFahrstrasse -> RuntimeSchema -> String
-showRS turnoutStates mFahrstrasse runtime = "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs ++ semaphoreObjs)
+showRS :: M.Map Integer TurnoutState -> [RuntimeFahrstrasse] -> RuntimeSchema -> String
+showRS turnoutStates fahrstrassen runtime = "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs ++ semaphoreObjs)
   where
     RuntimeSchema semaphores turnouts tracks ends = runtime
     (lTrackMap, rTrackMap) = foldr getTrack (M.empty, M.empty) tracks
@@ -202,10 +202,10 @@ showRS turnoutStates mFahrstrasse runtime = "\n\n" ++ unlines (printObjs $ track
     turnoutObjs = map (\(t, position) -> (position, getStrings t)) positionedTurnouts
       where
         getStrings :: RuntimeTurnout -> [[TC]]
-        getStrings t@(RTLeftUp nr _ _ _)    = showTurnout mFahrstrasse SLeftUp (turnoutSize t) nr $ tState nr
-        getStrings t@(RTRightUp nr _ _ _)   = showTurnout mFahrstrasse SRightUp (turnoutSize t) nr $ tState nr
-        getStrings t@(RTLeftDown nr _ _ _)  = showTurnout mFahrstrasse SLeftDown (turnoutSize t) nr $ tState nr
-        getStrings t@(RTRightDown nr _ _ _) = showTurnout mFahrstrasse SRightDown (turnoutSize t) nr $ tState nr
+        getStrings t@(RTLeftUp nr _ _ _)    = showTurnout fahrstrassen SLeftUp (turnoutSize t) nr $ tState nr
+        getStrings t@(RTRightUp nr _ _ _)   = showTurnout fahrstrassen SRightUp (turnoutSize t) nr $ tState nr
+        getStrings t@(RTLeftDown nr _ _ _)  = showTurnout fahrstrassen SLeftDown (turnoutSize t) nr $ tState nr
+        getStrings t@(RTRightDown nr _ _ _) = showTurnout fahrstrassen SRightDown (turnoutSize t) nr $ tState nr
 
         tState nr = fromMaybe Plus $ nr `M.lookup` turnoutStates
 
@@ -220,9 +220,7 @@ showRS turnoutStates mFahrstrasse runtime = "\n\n" ++ unlines (printObjs $ track
         aux (RSemaphoreLeft name r l) = ((3 * (rLevels M.! r) - 1, absoluteR M.! r - 2), [tc name, colorF name "◀<"])
         aux (RSemaphoreRight name l r) = ((3 * (rLevels M.! r), absoluteR M.! r - 2), [colorF name ">▶", tc $ " " ++ name])
 
-        colorF name = case mFahrstrasse of
-            Just (RuntimeFahrstrasse _ sem _ _ _) -> if sem == name then green else red
-            Nothing -> red
+        colorF name = if name `elem` map (\(RuntimeFahrstrasse _ sem _ _ _) -> sem) fahrstrassen then green else red
 
     showTrack :: RuntimeTrack -> [[TC]]
     showTrack (RTrack _ len nr l1 l2) = [colorF $ replicate leftLen '─' ++ nrRep ++ replicate rightLen '─']
@@ -231,9 +229,7 @@ showRS turnoutStates mFahrstrasse runtime = "\n\n" ++ unlines (printObjs $ track
         leftLen = (len - length nrRep) `div` 2
         rightLen = len - leftLen - length nrRep
 
-        colorF = case mFahrstrasse of
-            Just (RuntimeFahrstrasse _ _ _ _ ts) -> if (l1, l2) `elem` ts then green else tc
-            Nothing -> tc
+        colorF = if (l1, l2) `elem` concatMap (\(RuntimeFahrstrasse _ _ _ _ ts) -> ts) fahrstrassen then green else tc
 
 printObjs :: [((Int, Int), [[TC]])] -> [String]
 printObjs objs = fromCharMap $ foldr draw (toCharMap canvas) objs
@@ -254,8 +250,8 @@ printObjs objs = fromCharMap $ foldr draw (toCharMap canvas) objs
     auxChar nr (TC char) = if '@' `elem` char then id else M.insert nr (TC char)
 
 
-showTurnout :: Maybe RuntimeFahrstrasse -> STurnoutDirection td -> Int -> Integer -> TurnoutState -> [[TC]]
-showTurnout mFahrstrasse direction size nr state = case (direction, state) of
+showTurnout :: [RuntimeFahrstrasse] -> STurnoutDirection td -> Int -> Integer -> TurnoutState -> [[TC]]
+showTurnout fahrstrassen direction size nr state = case (direction, state) of
     (SLeftUp, Plus) ->
         tcc (cap direction ++ concatMap (line direction) [1..size - 1]) ++
         [ tc $ pad (size-1) ++ "    ╲ " ++ nrRep ++ spaces
@@ -309,9 +305,7 @@ showTurnout mFahrstrasse direction size nr state = case (direction, state) of
 
     pad n = replicate (n * 3) '@'
 
-    colorF = case mFahrstrasse of
-        Just (RuntimeFahrstrasse _ _ fp fm _) -> if toInteger nr `elem` fp || toInteger nr `elem` fm then green else tc
-        Nothing -> tc
+    colorF = if toInteger nr `elem` concatMap blockedTurnouts fahrstrassen then green else tc
 
 
 

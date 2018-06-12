@@ -70,3 +70,6 @@ instance RuntimeableInternalFahrstrasse (TeilweiseFahrstrasse (CompleteSchema (S
 
 blockedTurnouts :: RuntimeFahrstrasse -> [Integer]
 blockedTurnouts (RuntimeFahrstrasse _ _ fp fm _) = fp ++ fm
+
+fahrstrasseNr :: RuntimeFahrstrasse -> Int
+fahrstrasseNr (RuntimeFahrstrasse nr _ _ _ _) = nr
