@@ -28,7 +28,7 @@ library:
   source-dirs: src
 
 executables:
-  zazulak:
+  hel:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
