@@ -37,12 +37,12 @@ data TeilweiseFahrstrasse :: * -> * -> [*] -> [*] -> [*] -> [*] -> * where -- to
     FTrackCons :: (In (Track n l1 l2) t ~ 'True, In (Track n l1 l2) ft ~ 'False) =>
         Track n l1 l2 -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft fl
         -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm (Track n l1 l2 : ft) (Remove l1 (Remove l2 fl))
-    FStop :: Link ld lnr -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft fl
-        -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft (Remove (Link ld lnr) fl)
+    FStop :: (In (Link ld lnr) u ~ 'True, In (Link ld lnr) fl ~ 'False) => Link ld lnr -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft fl
+        -> TeilweiseFahrstrasse (CompleteSchema (Schema s p t l u)) sem fp fm ft (Link ld lnr : fl)
 
 deriving instance Show (TeilweiseFahrstrasse schema sem fp fm ft fl)
 
 data Fahrstrasse fahrstrasse where
-    Fahrstrasse :: TeilweiseFahrstrasse schema sem fp fm ft '[] -> Fahrstrasse (TeilweiseFahrstrasse schema sem fp fm ft '[])
+    Fahrstrasse :: Int -> TeilweiseFahrstrasse schema sem fp fm ft '[] -> Fahrstrasse (TeilweiseFahrstrasse schema sem fp fm ft '[])
 
 deriving instance Show (Fahrstrasse fahrstrasse)

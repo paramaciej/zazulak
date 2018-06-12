@@ -37,7 +37,7 @@ instance KnownNat n => SchemaShow (Track n l1 l2) where
         rightLen = len - leftLen - length nrRep
 
 instance SchemaShow (Turnout td n) where
-    sShow (Turnout direction) = unlines $ showTurnout direction 3 (natVal $ Proxy @n) Plus
+    sShow (Turnout direction) = unlines $ map show $ showTurnout Nothing direction 3 (natVal $ Proxy @n) Plus
 
 instance SchemaShow (SingleTurnout l1 l2 l3) where
     sShow (SingleTurnoutLeftUp t _ _ _)    = sShow t

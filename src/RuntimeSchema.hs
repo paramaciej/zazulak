@@ -24,11 +24,10 @@ import           Data.Maybe
 import           Data.Proxy
 import qualified Data.Set            as S
 import           GHC.TypeLits
+import           RuntimeFahrstrasse
 import           Schema
 import           System.Console.ANSI
 
-newtype RLeftLink = RLeftLink Integer deriving (Show, Eq, Ord)
-newtype RRightLink = RRightLink Integer deriving (Show, Eq, Ord)
 
 data RuntimeSemaphore
     = RSemaphoreLeft String RRightLink RLeftLink
@@ -107,9 +106,8 @@ turnoutLinks (RTLeftDown _ r l1 l2)  = ([l1, l2], [r])
 turnoutLinks (RTRightUp _ l r1 r2)   = ([l], [r1, r2])
 turnoutLinks (RTRightDown _ l r1 r2) = ([l], [r1, r2])
 
-showRS :: M.Map Integer TurnoutState -> RuntimeSchema -> String
-showRS turnoutStates runtime =
-    show positionedTurnouts ++ "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs ++ semaphoreObjs)
+showRS :: M.Map Integer TurnoutState -> Maybe RuntimeFahrstrasse -> RuntimeSchema -> String
+showRS turnoutStates mFahrstrasse runtime = "\n\n" ++ unlines (printObjs $ trackObjs ++ turnoutObjs ++ semaphoreObjs)
   where
     RuntimeSchema semaphores turnouts tracks ends = runtime
     (lTrackMap, rTrackMap) = foldr getTrack (M.empty, M.empty) tracks
@@ -201,26 +199,41 @@ showRS turnoutStates runtime =
         width t = 3 * (turnoutSize t + 2)
 
     turnoutObjs :: [((Int, Int), [[TC]])]
-    turnoutObjs = map (\(t, position) -> (position, map tc $ getStrings t)) positionedTurnouts
+    turnoutObjs = map (\(t, position) -> (position, getStrings t)) positionedTurnouts
       where
-        getStrings :: RuntimeTurnout -> [String]
-        getStrings t@(RTLeftUp nr _ _ _)    = showTurnout SLeftUp (turnoutSize t) nr $ tState nr
-        getStrings t@(RTRightUp nr _ _ _)   = showTurnout SRightUp (turnoutSize t) nr $ tState nr
-        getStrings t@(RTLeftDown nr _ _ _)  = showTurnout SLeftDown (turnoutSize t) nr $ tState nr
-        getStrings t@(RTRightDown nr _ _ _) = showTurnout SRightDown (turnoutSize t) nr $ tState nr
+        getStrings :: RuntimeTurnout -> [[TC]]
+        getStrings t@(RTLeftUp nr _ _ _)    = showTurnout mFahrstrasse SLeftUp (turnoutSize t) nr $ tState nr
+        getStrings t@(RTRightUp nr _ _ _)   = showTurnout mFahrstrasse SRightUp (turnoutSize t) nr $ tState nr
+        getStrings t@(RTLeftDown nr _ _ _)  = showTurnout mFahrstrasse SLeftDown (turnoutSize t) nr $ tState nr
+        getStrings t@(RTRightDown nr _ _ _) = showTurnout mFahrstrasse SRightDown (turnoutSize t) nr $ tState nr
 
         tState nr = fromMaybe Plus $ nr `M.lookup` turnoutStates
 
     trackObjs :: [((Int, Int), [[TC]])]
     trackObjs = map aux tracks
       where
-        aux t@(RTrack level len nr r l) = ((3 * level, absoluteR M.! r), map tc $ showTrack t)
+        aux t@(RTrack level len nr r l) = ((3 * level, absoluteR M.! r), showTrack t)
 
     semaphoreObjs :: [((Int, Int), [[TC]])]
     semaphoreObjs = map aux semaphores
       where
-        aux (RSemaphoreLeft name r l) = ((3 * (rLevels M.! r) - 1, absoluteR M.! r - 2), [tc name, red "◀<"])
-        aux (RSemaphoreRight name l r) = ((3 * (rLevels M.! r), absoluteR M.! r - 2), [red ">▶", tc $ " " ++ name])
+        aux (RSemaphoreLeft name r l) = ((3 * (rLevels M.! r) - 1, absoluteR M.! r - 2), [tc name, colorF name "◀<"])
+        aux (RSemaphoreRight name l r) = ((3 * (rLevels M.! r), absoluteR M.! r - 2), [colorF name ">▶", tc $ " " ++ name])
+
+        colorF name = case mFahrstrasse of
+            Just (RuntimeFahrstrasse _ sem _ _ _) -> if sem == name then green else red
+            Nothing -> red
+
+    showTrack :: RuntimeTrack -> [[TC]]
+    showTrack (RTrack _ len nr l1 l2) = [colorF $ replicate leftLen '─' ++ nrRep ++ replicate rightLen '─']
+      where
+        nrRep = if nr > 0 then show nr else ""
+        leftLen = (len - length nrRep) `div` 2
+        rightLen = len - leftLen - length nrRep
+
+        colorF = case mFahrstrasse of
+            Just (RuntimeFahrstrasse _ _ _ _ ts) -> if (l1, l2) `elem` ts then green else tc
+            Nothing -> tc
 
 printObjs :: [((Int, Int), [[TC]])] -> [String]
 printObjs objs = fromCharMap $ foldr draw (toCharMap canvas) objs
@@ -238,47 +251,47 @@ printObjs objs = fromCharMap $ foldr draw (toCharMap canvas) objs
     draw ((x, y), ss) accCanvas = M.foldrWithKey auxLine accCanvas (M.mapKeys (+x) $ M.map (M.mapKeys (+y)) (toCharMap ss))
     auxLine :: Int -> M.Map Int TC -> M.Map Int (M.Map Int TC) -> M.Map Int (M.Map Int TC)
     auxLine line mp accCanvas = M.insert line (M.foldrWithKey auxChar (accCanvas M.! line) mp) accCanvas
-    auxChar nr char = if char /= TC "@" then M.insert nr char else id
+    auxChar nr (TC char) = if '@' `elem` char then id else M.insert nr (TC char)
 
 
-showTurnout :: STurnoutDirection td -> Int -> Integer -> TurnoutState -> [String]
-showTurnout direction size nr state = case (direction, state) of
+showTurnout :: Maybe RuntimeFahrstrasse -> STurnoutDirection td -> Int -> Integer -> TurnoutState -> [[TC]]
+showTurnout mFahrstrasse direction size nr state = case (direction, state) of
     (SLeftUp, Plus) ->
-        cap direction ++ concatMap (line direction) [1..size - 1] ++
-        [ pad (size-1) ++ "    ╲ " ++ nrRep ++ spaces
-        , pad (size-1) ++ "─────────"
+        tcc (cap direction ++ concatMap (line direction) [1..size - 1]) ++
+        [ tc $ pad (size-1) ++ "    ╲ " ++ nrRep ++ spaces
+        , colorF $ pad (size-1) ++ "─────────"
         ]
     (SLeftUp, Minus) ->
-        cap direction ++ concatMap (line direction) [1..size - 1] ++
-        [ pad (size-1) ++ "    ╲ " ++ nrRep ++ spaces
-        , pad (size-1) ++ "───  ╲───"
+        map colorF (cap direction ++ concatMap (line direction) [1..size - 1]) ++
+        [ colorF $ pad (size-1) ++ "    ╲ " ++ nrRep ++ spaces
+        , tc (pad (size-1) ++ "───") ++ colorF "  ╲───"
         ]
     (SRightUp, Plus) ->
-        cap direction ++ concatMap (line direction) [1..size - 1] ++
-        [ spaces ++ nrRep ++ " ╱    "
-        , "─────────"
+        tcc (cap direction ++ concatMap (line direction) [1..size - 1]) ++
+        [ tc $ spaces ++ nrRep ++ " ╱    "
+        , colorF "─────────"
         ]
     (SRightUp, Minus) ->
-        cap direction ++ concatMap (line direction) [1..size - 1] ++
-        [ spaces ++ nrRep ++ " ╱    "
-        , "───╱  ───"
+        map colorF (cap direction ++ concatMap (line direction) [1..size - 1]) ++
+        [ colorF $ spaces ++ nrRep ++ " ╱    "
+        , colorF "───╱" ++ tc "  ───"
         ]
     (SLeftDown, Plus) ->
-        [ pad (size-1) ++ "─────────"
-        , pad (size-1) ++ "    ╱ " ++ nrRep ++ spaces
-        ] ++ concatMap (line direction) [1..size - 1] ++ cap direction
+        [ colorF $ pad (size-1) ++ "─────────"
+        , tc $ pad (size-1) ++ "    ╱ " ++ nrRep ++ spaces
+        ] ++ tcc (concatMap (line direction) [1..size - 1] ++ cap direction)
     (SLeftDown, Minus) ->
-        [ pad (size-1) ++ "───  ╱───"
-        , pad (size-1) ++ "    ╱ " ++ nrRep ++ spaces
-        ] ++ concatMap (line direction) [1..size - 1] ++ cap direction
+        [ tc (pad (size-1) ++ "───") ++ colorF "  ╱───"
+        , colorF $ pad (size-1) ++ "    ╱ " ++ nrRep ++ spaces
+        ] ++ map colorF (concatMap (line direction) [1..size - 1] ++ cap direction)
     (SRightDown, Plus) ->
-        [ "─────────"
-        , spaces ++ nrRep ++ " ╲    "
-        ] ++ concatMap (line direction) [1..size - 1] ++ cap direction
+        [ colorF "─────────"
+        , tc $ spaces ++ nrRep ++ " ╲    "
+        ] ++ tcc (concatMap (line direction) [1..size - 1] ++ cap direction)
     (SRightDown, Minus) ->
-        [ "───╲  ───"
-        , spaces ++ nrRep ++ " ╲    "
-        ] ++ concatMap (line direction) [1..size - 1] ++ cap direction
+        [ colorF "───╲" ++ tc "  ───"
+        , colorF $ spaces ++ nrRep ++ " ╲    "
+        ] ++ map colorF (concatMap (line direction) [1..size - 1] ++ cap direction)
   where
     nrRep = show nr
     spaces = replicate (3 - length nrRep) ' '
@@ -296,13 +309,11 @@ showTurnout direction size nr state = case (direction, state) of
 
     pad n = replicate (n * 3) '@'
 
+    colorF = case mFahrstrasse of
+        Just (RuntimeFahrstrasse _ _ fp fm _) -> if toInteger nr `elem` fp || toInteger nr `elem` fm then green else tc
+        Nothing -> tc
 
-showTrack :: RuntimeTrack -> [String]
-showTrack (RTrack _ len nr _ _) = [replicate leftLen '─' ++ nrRep ++ replicate rightLen '─']
-  where
-    nrRep = if nr > 0 then show nr else ""
-    leftLen = (len - length nrRep) `div` 2
-    rightLen = len - leftLen - length nrRep
+
 
 
 newtype TC = TC String deriving Eq -- turbo char
@@ -318,3 +329,6 @@ green = map (TC . (\c -> setSGRCode [SetColor Foreground Vivid Green] ++ c : set
 
 tc :: String -> [TC]
 tc = map (TC . (:[]))
+
+tcc :: [String] -> [[TC]]
+tcc = map tc

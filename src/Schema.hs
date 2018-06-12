@@ -23,7 +23,7 @@ data STurnoutDirection td where
 
 deriving instance Show (STurnoutDirection td)
 
-data TurnoutState = Plus | Minus
+data TurnoutState = Plus | Minus deriving Eq
 
 data Turnout (td :: TurnoutDirection) (n :: Nat) where
     Turnout :: KnownNat n => STurnoutDirection td -> Turnout td n

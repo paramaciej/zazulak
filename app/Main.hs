@@ -20,26 +20,48 @@ import           System.IO
 import           Text.Read
 
 
-signalBoxProgram :: M.Map Integer TurnoutState -> IO ()
-signalBoxProgram turnoutStates = do
+signalBoxProgram :: M.Map Integer TurnoutState -> Maybe RuntimeFahrstrasse -> IO ()
+signalBoxProgram turnoutStates mFahrstrasse = do
     clearScreen
     setCursorPosition 0 0
 
-    putStrLn $ showRS turnoutStates $ getRuntimeSchema helSchema
+    putStrLn $ showRS turnoutStates mFahrstrasse $ getRuntimeSchema helSchema
 
-    print $ getRuntimeFahrstrasse helFahrA1
+    let availableFahrstrassen = M.fromList $ map (\fs@(RuntimeFahrstrasse nr _ _ _ _) -> (nr, fs))
+                                [ getRuntimeFahrstrasse helFahr1
+                                , getRuntimeFahrstrasse helFahr2
+                                , getRuntimeFahrstrasse helFahr3
+                                , getRuntimeFahrstrasse helFahr4
+                                , getRuntimeFahrstrasse helFahr5
+                                , getRuntimeFahrstrasse helFahr6
+                                , getRuntimeFahrstrasse helFahr7
+                                , getRuntimeFahrstrasse helFahr8
+                                ]
+
+    putStrLn $ intercalate "\n" $ map show $ M.elems availableFahrstrassen
 
     putStr "\n?>"
     hFlush stdout
     getLine >>= \case
         "q" -> putStrLn "Auf wiedersehen!"
         input -> case stripPrefix "r" input >>= (\nr -> readMaybe nr :: Maybe Integer) of
-            Just nr  -> signalBoxProgram (M.insert nr newVal turnoutStates)
+            Just nr -> if nr `elem` maybe [] blockedTurnouts mFahrstrasse
+                then signalBoxProgram turnoutStates mFahrstrasse
+                else signalBoxProgram (M.insert nr newVal turnoutStates) mFahrstrasse
               where
                 newVal = case fromMaybe Plus (nr `M.lookup` turnoutStates) of
                                                          Plus  -> Minus
                                                          Minus -> Plus
-            Nothing -> signalBoxProgram turnoutStates
+            Nothing -> case stripPrefix "p" input >>= (\nr -> readMaybe nr :: Maybe Int) of
+                Just fNr -> case mFahrstrasse of
+                    Just (RuntimeFahrstrasse nr _ _ _ _) -> if fNr == nr then signalBoxProgram turnoutStates Nothing else signalBoxProgram turnoutStates mFahrstrasse
+                    Nothing -> case fNr `M.lookup` availableFahrstrassen of
+                        Nothing -> signalBoxProgram turnoutStates Nothing
+                        Just fs@(RuntimeFahrstrasse _ _ fp fm _) ->
+                            if all (\x -> fromMaybe Plus (x `M.lookup` turnoutStates) == Plus) fp && all (\x -> fromMaybe Plus (x `M.lookup` turnoutStates) == Minus) fm
+                                then signalBoxProgram turnoutStates (Just fs)
+                                else signalBoxProgram turnoutStates mFahrstrasse
+                Nothing -> signalBoxProgram turnoutStates mFahrstrasse
 
 
 
@@ -69,11 +91,6 @@ main = do
 
     putStrLn $ sShow ultimate
 
-    let x = getRuntimeSchema ultimate
-
-    print x
-    print $ allLinks x
-    putStrLn $ showRS (M.singleton 1 Minus) x
 
 
-    signalBoxProgram M.empty
+    signalBoxProgram M.empty Nothing
