@@ -6,6 +6,8 @@ Stations schemas and traversal routes (*de: Fahrstraße*/*pl: droga przebiegu*) 
 
 In runtime there is simple interface showing station in a schematic way and possibility to switch turnouts and activate/deactivate traversal routes.
 
+![Screenshot](https://dev.paramaciej.pl/images/zazulak-screenshot.png)
+
 ## Compiling
 
 ```
